@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: larapicone-app
+    restart: unless-stopped
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+    ports:
+      - "9003:80"
+    environment:
+      - "DB_HOST=host.docker.internal"
+      - "DB_DATABASE=larapicone"
+      - "DB_USERNAME=root"
+      - "DB_PASSWORD=root"
+    networks:
+      - laravel
+
+  db:
+    image: mysql:8.0
+    container_name: larapicone-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: larapicone
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - dbdata:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - laravel
+
+networks:
+  laravel:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
