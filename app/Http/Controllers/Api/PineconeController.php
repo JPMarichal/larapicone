@@ -106,7 +106,7 @@ class PineconeController extends Controller
     public function getVector(Request $request, string $id)
     {
         try {
-            $includeValues = $request->get('include_values', 'true') === 'true';
+            $includeValues = $request->get('include_values', 'false') === 'true';
             $result = $this->pineconeService->getVector($id, $includeValues);
             
             return response()->json([
