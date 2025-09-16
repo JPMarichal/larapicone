@@ -1,61 +1,145 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Google OAuth Application
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Una aplicación Laravel con autenticación social de Google usando Docker.
 
-## About Laravel
+## Características
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- ✅ Laravel 11 con PHP 8.2
+- ✅ Autenticación social con Google OAuth
+- ✅ Contenedores Docker para desarrollo
+- ✅ Base de datos MySQL en host
+- ✅ Puerto 9003 para acceso desde host
+- ✅ Laravel Socialite integrado
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requisitos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Docker y Docker Compose
+- Cuenta de Google Developer Console
+- Puerto 9003 disponible
 
-## Learning Laravel
+## Instalación
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+1. **Clonar el repositorio:**
+```bash
+git clone https://github.com/JPMarichal/larapicone.git
+cd larapicone
+```
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+2. **Configurar variables de entorno:**
+```bash
+cp .env.example .env
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+3. **Configurar Google OAuth:**
+   - Ve a [Google Cloud Console](https://console.cloud.google.com/)
+   - Crea un nuevo proyecto o selecciona uno existente
+   - Habilita la API de Google+
+   - Crea credenciales OAuth 2.0
+   - Configura las URIs de redirección: `http://localhost:9003/auth/google/callback`
 
-## Laravel Sponsors
+4. **Actualizar el archivo .env:**
+```env
+GOOGLE_CLIENT_ID=tu_google_client_id_aqui
+GOOGLE_CLIENT_SECRET=tu_google_client_secret_aqui
+GOOGLE_REDIRECT_URI=http://localhost:9003/auth/google/callback
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+5. **Construir y ejecutar los contenedores:**
+```bash
+docker-compose up --build -d
+```
 
-### Premium Partners
+6. **Instalar dependencias:**
+```bash
+docker exec larapicone-app composer install
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+7. **Ejecutar migraciones:**
+```bash
+docker exec larapicone-app php artisan migrate
+```
 
-## Contributing
+## Uso
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+1. **Acceder a la aplicación:**
+   - Abre tu navegador en `http://localhost:9003`
 
-## Code of Conduct
+2. **Iniciar sesión:**
+   - Haz clic en "Login with Google"
+   - Autoriza la aplicación en Google
+   - Serás redirigido al dashboard
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+3. **Dashboard:**
+   - Verás tu información de perfil de Google
+   - Podrás cerrar sesión
 
-## Security Vulnerabilities
+## Estructura del Proyecto
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```
+├── app/
+│   ├── Http/Controllers/Auth/
+│   │   └── GoogleController.php     # Controlador OAuth
+│   └── Models/
+│       └── User.php                 # Modelo con campos Google
+├── database/migrations/
+│   └── *_add_google_fields_to_users_table.php
+├── resources/views/
+│   ├── welcome.blade.php            # Página principal
+│   └── dashboard.blade.php          # Dashboard autenticado
+├── routes/
+│   └── web.php                      # Rutas OAuth
+├── docker-compose.yml               # Configuración Docker
+├── Dockerfile                       # Imagen de la aplicación
+└── docker/nginx/nginx.conf          # Configuración Nginx
+```
 
-## License
+## Rutas Disponibles
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- `GET /` - Página principal
+- `GET /auth/google` - Iniciar OAuth con Google
+- `GET /auth/google/callback` - Callback de Google
+- `GET /dashboard` - Dashboard (requiere autenticación)
+- `POST /logout` - Cerrar sesión
+
+## Comandos Útiles
+
+```bash
+# Ver logs de la aplicación
+docker-compose logs -f app
+
+# Acceder al contenedor
+docker exec -it larapicone-app bash
+
+# Reiniciar contenedores
+docker-compose restart
+
+# Parar contenedores
+docker-compose down
+```
+
+## Configuración de Base de Datos
+
+La aplicación usa MySQL en un contenedor separado:
+- **Host:** localhost
+- **Puerto:** 3307
+- **Base de datos:** larapicone
+- **Usuario:** root
+- **Contraseña:** root
+
+## Troubleshooting
+
+1. **Error de conexión a base de datos:**
+   - Verifica que el contenedor MySQL esté ejecutándose
+   - Revisa las variables de entorno en `.env`
+
+2. **Error de Google OAuth:**
+   - Verifica las credenciales en Google Console
+   - Asegúrate de que la URI de redirección esté configurada correctamente
+
+3. **Puerto 9003 ocupado:**
+   - Cambia el puerto en `docker-compose.yml`
+   - Actualiza `APP_URL` y `GOOGLE_REDIRECT_URI` en `.env`
+
+## Licencia
+
+Este proyecto está bajo la licencia MIT.

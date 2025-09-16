@@ -26,10 +26,18 @@ class GoogleController extends Controller
         try {
             $googleUser = Socialite::driver('google')->user();
             
+            // Log removed for production performance
+            
             $user = User::where('email', $googleUser->email)->first();
             
             if ($user) {
+                // Update existing user with Google data
+                $user->update([
+                    'google_id' => $googleUser->id,
+                    'avatar' => $googleUser->avatar,
+                ]);
                 Auth::login($user);
+                // Existing user logged in
             } else {
                 $user = User::create([
                     'name' => $googleUser->name,
@@ -37,15 +45,18 @@ class GoogleController extends Controller
                     'google_id' => $googleUser->id,
                     'avatar' => $googleUser->avatar,
                     'email_verified_at' => now(),
+                    'password' => bcrypt(str()->random(24)), // Add required password field
                 ]);
                 
                 Auth::login($user);
+                // New user created and logged in
             }
             
             return redirect()->intended('/dashboard');
             
         } catch (\Exception $e) {
-            return redirect('/login')->with('error', 'Something went wrong with Google authentication.');
+            \Log::error('Google OAuth error:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return redirect('/')->with('error', 'Something went wrong with Google authentication: ' . $e->getMessage());
         }
     }
 }
