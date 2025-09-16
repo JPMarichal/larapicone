@@ -50,6 +50,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // Pinecone API Routes
 Route::prefix('pinecone')->group(function () {
+    // Debug endpoint
+    Route::get('/debug', [PineconeController::class, 'debug']);
     // Query vectors
     Route::post('/query', [PineconeController::class, 'query']);
     
@@ -58,6 +60,9 @@ Route::prefix('pinecone')->group(function () {
     
     // Get vector by ID
     Route::get('/vector/{id}', [PineconeController::class, 'getVector']);
+    
+    // Get vector by reference
+    Route::post('/vector/reference', [PineconeController::class, 'getVectorByReference']);
     
     // Delete vectors
     Route::delete('/delete', [PineconeController::class, 'delete']);

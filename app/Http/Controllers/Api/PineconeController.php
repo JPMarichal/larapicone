@@ -16,6 +16,29 @@ class PineconeController extends Controller
     {
         $this->pineconeService = $pineconeService;
     }
+    
+    /**
+     * Get debug information about the Pinecone index
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function debug()
+    {
+        try {
+            $debugInfo = $this->pineconeService->getDebugInfo();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $debugInfo
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
 
     /**
      * Query the Pinecone index
@@ -108,6 +131,51 @@ class PineconeController extends Controller
         try {
             $includeValues = $request->get('include_values', 'false') === 'true';
             $result = $this->pineconeService->getVector($id, $includeValues);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete vectors by ID or filter
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    /**
+     * Get vector by reference
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getVectorByReference(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'reference' => 'required|string',
+            'include_values' => 'sometimes|boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $reference = $request->input('reference');
+            $includeValues = $request->boolean('include_values', false);
+            
+            $result = $this->pineconeService->getVectorByReference($reference, $includeValues);
             
             return response()->json([
                 'success' => true,
