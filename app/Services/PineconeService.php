@@ -6,6 +6,11 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
+// Define CURL_SSLVERSION_TLSv1_2 if not defined
+if (!defined('CURL_SSLVERSION_TLSv1_2')) {
+    define('CURL_SSLVERSION_TLSv1_2', 6);
+}
+
 class PineconeService
 {
     protected Client $client;
@@ -15,6 +20,16 @@ class PineconeService
     protected string $namespace;
     protected int $timeout;
 
+    /**
+     * Get the HTTP client instance
+     * 
+     * @return \GuzzleHttp\Client
+     */
+    public function getClient(): Client
+    {
+        return $this->client;
+    }
+
     public function __construct()
     {
         $this->apiKey = config('pinecone.api_key');
@@ -23,14 +38,18 @@ class PineconeService
         $this->namespace = config('pinecone.namespace');
         $this->timeout = config('pinecone.timeout', 30);
 
+        // Use the exact hostname from Pinecone dashboard
         $this->client = new Client([
-            'base_uri' => "https://{$this->index}-{$this->environment}.svc.{$this->environment}.pinecone.io/",
+            'base_uri' => "https://escrituras-i17oiaw.svc.aped-4627-b74a.pinecone.io/",
             'headers' => [
                 'Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
             ],
             'timeout' => $this->timeout,
+            'verify' => false, // Disable SSL verification
+            'http_errors' => true, // Enable HTTP errors
+            'debug' => false, // Disable debug to avoid output issues
         ]);
     }
 
@@ -92,14 +111,21 @@ class PineconeService
      * Get vector by ID
      *
      * @param string $id
+     * @param bool $includeValues Whether to include the vector values in the response
      * @return array
      * @throws \Exception
      */
-    public function getVector(string $id): array
+    public function getVector(string $id, bool $includeValues = true): array
     {
         try {
             $response = $this->client->get("vectors/fetch?ids={$id}&namespace={$this->namespace}");
-            return json_decode($response->getBody()->getContents(), true);
+            $result = json_decode($response->getBody()->getContents(), true);
+            
+            if (!$includeValues && isset($result['vectors'][$id])) {
+                unset($result['vectors'][$id]['values']);
+            }
+            
+            return $result;
         } catch (GuzzleException $e) {
             Log::error('Pinecone get vector error: ' . $e->getMessage());
             throw new \Exception('Error getting vector from Pinecone: ' . $e->getMessage(), 0, $e);
