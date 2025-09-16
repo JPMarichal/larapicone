@@ -5,17 +5,32 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Test route to verify controller is working
-Route::get('/pinecone/test', function () {
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Pinecone API is working!',
-        'routes' => [
-            'query' => 'POST /api/pinecone/query',
-            'upsert' => 'POST /api/pinecone/upsert',
-            'getVector' => 'GET /api/pinecone/vector/{id}',
-            'delete' => 'DELETE /api/pinecone/delete'
-        ]
-    ]);
+Route::get('/pinecone/test', function (\App\Services\PineconeService $pinecone) {
+    try {
+        // Test connection by getting a vector (using a known ID from your screenshot)
+        $testId = 'AT-genesis-06-010';
+        $vector = $pinecone->getVector($testId);
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Successfully connected to Pinecone!',
+            'vector_id' => $testId,
+            'vector_data' => $vector,
+            'config' => [
+                'environment' => config('pinecone.environment'),
+                'index' => config('pinecone.index'),
+                'namespace' => config('pinecone.namespace'),
+                'base_uri' => "https://" . config('pinecone.index') . "-" . config('pinecone.environment') . ".svc." . config('pinecone.environment') . ".pinecone.io/"
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error connecting to Pinecone: ' . $e->getMessage(),
+            'file' => $e->getFile() . ':' . $e->getLine(),
+            'trace' => $e->getTraceAsString(),
+        ], 500);
+    }
 });
 
 /*
