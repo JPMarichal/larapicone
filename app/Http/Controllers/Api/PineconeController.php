@@ -99,13 +99,15 @@ class PineconeController extends Controller
     /**
      * Get vector by ID
      *
+     * @param Request $request
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getVector(string $id)
+    public function getVector(Request $request, string $id)
     {
         try {
-            $result = $this->pineconeService->getVector($id);
+            $includeValues = $request->get('include_values', 'true') === 'true';
+            $result = $this->pineconeService->getVector($id, $includeValues);
             
             return response()->json([
                 'success' => true,
