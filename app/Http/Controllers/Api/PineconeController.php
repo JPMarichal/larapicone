@@ -1,0 +1,160 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Services\PineconeService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+
+class PineconeController extends Controller
+{
+    protected PineconeService $pineconeService;
+
+    public function __construct(PineconeService $pineconeService)
+    {
+        $this->pineconeService = $pineconeService;
+    }
+
+    /**
+     * Query the Pinecone index
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function query(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'vector' => 'required|array',
+            'vector.*' => 'numeric',
+            'top_k' => 'sometimes|integer|min:1|max:100',
+            'filter' => 'sometimes|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $result = $this->pineconeService->query(
+                $request->input('vector'),
+                $request->input('top_k', 5),
+                $request->input('filter', [])
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upsert vectors to the index
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function upsert(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'vectors' => 'required|array',
+            'vectors.*.id' => 'required|string',
+            'vectors.*.values' => 'required|array',
+            'vectors.*.values.*' => 'numeric',
+            'vectors.*.metadata' => 'sometimes|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $result = $this->pineconeService->upsertVectors($request->input('vectors'));
+            
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get vector by ID
+     *
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getVector(string $id)
+    {
+        try {
+            $result = $this->pineconeService->getVector($id);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete vectors by ID or filter
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function delete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'sometimes|array',
+            'ids.*' => 'string',
+            'filter' => 'sometimes|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $result = $this->pineconeService->deleteVectors(
+                $request->input('ids', []),
+                $request->input('filter', [])
+            );
+            
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+}
