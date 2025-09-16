@@ -4,6 +4,20 @@ use App\Http\Controllers\Api\PineconeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Test route to verify controller is working
+Route::get('/pinecone/test', function () {
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Pinecone API is working!',
+        'routes' => [
+            'query' => 'POST /api/pinecone/query',
+            'upsert' => 'POST /api/pinecone/upsert',
+            'getVector' => 'GET /api/pinecone/vector/{id}',
+            'delete' => 'DELETE /api/pinecone/delete'
+        ]
+    ]);
+});
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
