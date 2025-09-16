@@ -232,48 +232,252 @@ class PineconeService
     }
 
     /**
-     * Convert a reference like 'Génesis 6:10' to a vector ID like 'AT-genesis-06-010'
+     * Normalize text by converting to lowercase and handling special cases
      */
-    private function referenceToId(string $reference): string
+    private function normalizeText(string $text): string
     {
-        // Example: 'Génesis 6:10' -> 'AT-genesis-06-010'
-        $parts = explode(' ', $reference, 2);
-        if (count($parts) < 2) {
-            throw new \Exception('Invalid reference format. Expected format: "Libro 1:1"');
+        // Special case for Mosíah to match the ID format in the database
+        if (stripos($text, 'mosíah') !== false || stripos($text, 'mosiah') !== false) {
+            return 'mosiah';
         }
         
-        $book = $this->normalizeBookName($parts[0]);
-        $chapterVerse = $parts[1];
+        // Convert to lowercase
+        $text = mb_strtolower(trim($text));
         
-        // Handle chapter:verse format
-        if (str_contains($chapterVerse, ':')) {
-            list($chapter, $verse) = explode(':', $chapterVerse);
-            $chapter = str_pad($chapter, 2, '0', STR_PAD_LEFT);
-            $verse = str_pad($verse, 3, '0', STR_PAD_LEFT);
-            return sprintf('AT-%s-%s-%s', $book, $chapter, $verse);
-        }
+        // Keep only letters, numbers, and spaces
+        $text = preg_replace('/[^a-z0-9\s]/u', '', $text);
         
-        // If no verse, just use chapter
-        $chapter = str_pad($chapterVerse, 2, '0', STR_PAD_LEFT);
-        return sprintf('AT-%s-%s-000', $book, $chapter);
+        // Normalize spaces (multiple spaces to single space)
+        $text = preg_replace('/\s+/', ' ', $text);
+        
+        return trim($text);
     }
     
     /**
-     * Normalize book name to ID format (e.g., 'Génesis' -> 'genesis')
+     * Get volume code based on book name
+     */
+    private function getVolumeCode(string $book): string
+    {
+        $originalBook = $book;
+        
+        // Handle common typos in the original input before normalization
+        if (preg_match('/^1\s*nefi/i', $book)) {
+            $book = '1 nefi';
+        } elseif (preg_match('/^2\s*nefi/i', $book)) {
+            $book = '2 nefi';
+        } elseif (preg_match('/^3\s*nefi/i', $book)) {
+            $book = '3 nefi';
+        }
+        
+        // Now normalize the book name
+        $book = $this->normalizeText($book);
+        
+        Log::debug('Volume code lookup', [
+            'original_book' => $originalBook,
+            'normalized_book' => $book
+        ]);
+        
+        // Check for Book of Mormon books (1 Nefi, 2 Nefi, etc.)
+        $bomPatterns = [
+            '/^1\s*nephi/', '/^1\s*nefi/', '/^2\s*nephi/', '/^2\s*nefi/', 
+            '/^3\s*nephi/', '/^3\s*nefi/', '/^4\s*nephi/',
+            '/^jacob/', '/^enos/', '/^jarom/', '/^omni/', 
+            '/^palabrasdemormon/', '/^mormon/', '/^eter/', '/^moroni/'
+        ];
+        
+        // Also check for exact matches after normalization
+        $normalizedBookNames = [
+            '1nephi', '1nefi', '2nephi', '2nefi', '3nephi', '3nefi', '4nephi',
+            'jacob', 'enos', 'jarom', 'omni', 'palabrasdemormon', 'mormon', 'eter', 'moroni'
+        ];
+        
+        if (in_array($book, $normalizedBookNames)) {
+            return 'BM';
+        }
+        
+        foreach ($bomPatterns as $pattern) {
+            if (preg_match($pattern, $book)) {
+                Log::debug('Matched Book of Mormon book', ['book' => $book, 'pattern' => $pattern]);
+                return 'BM';
+            }
+        }
+        
+        // Check for Doctrine and Covenants
+        if (preg_match('/^doctrina y convenios|^d\s?y\s?c/', $book)) {
+            return 'DC';
+        }
+        
+        // Check for Pearl of Great Price books
+        $pgpPatterns = [
+            '/^mos/', '/^abrah/', '/^jose smith/', '/^jose smithmat/', 
+            '/^jose smithhist/', '/^articulos de fe/'
+        ];
+        
+        foreach ($pgpPatterns as $pattern) {
+            if (preg_match($pattern, $book)) {
+                return 'PGP';
+            }
+        }
+        
+        // List of New Testament books (normalized without diacritics)
+        $newTestamentBooks = [
+            'mateo', 'marcos', 'lucas', 'juan', 'hechos', 'romanos', '1 corintios', '2 corintios',
+            'galatas', 'efesios', 'filipenses', 'colosenses', '1 tesalonicenses', '2 tesalonicenses',
+            '1 timoteo', '2 timoteo', 'tito', 'filemon', 'hebreos', 'santiago', '1 pedro', '2 pedro',
+            '1 juan', '2 juan', '3 juan', 'judas', 'apocalipsis', 'revelacion'
+        ];
+        
+        foreach ($newTestamentBooks as $ntBook) {
+            if (str_starts_with($book, $ntBook)) {
+                return 'NT';
+            }
+        }
+        
+        // List of Old Testament books (normalized without diacritics)
+        $oldTestamentBooks = [
+            'genesis', 'exodo', 'levitico', 'numeros', 'deuteronomio', 'josue', 'jueces', 'rut',
+            '1 samuel', '2 samuel', '1 reyes', '2 reyes', '1 cronicas', '2 cronicas', 'esdras',
+            'nehemias', 'ester', 'job', 'salmos', 'proverbios', 'eclesiastes', 'cantares',
+            'isaias', 'jeremias', 'lamentaciones', 'ezequiel', 'daniel', 'oseas', 'joel',
+            'amos', 'abdias', 'jonas', 'miqueas', 'nahum', 'habacuc', 'sofonias', 'hageo',
+            'zacarias', 'malaquias', 'tobias', 'judit', 'ester griego',
+            'sabiduria', 'eclesiastico', 'baruc', '1 macabeos', '2 macabeos', 'daniel griego'
+        ];
+        
+        foreach ($oldTestamentBooks as $otBook) {
+            if (str_starts_with($book, $otBook)) {
+                return 'AT';
+            }
+        }
+        
+        // If we get here, the book wasn't recognized
+        $errorMessage = "Libro no reconocido: " . $originalBook . ". Normalized as: " . $book;
+        Log::error($errorMessage, [
+            'original_book' => $originalBook,
+            'normalized_book' => $book,
+            'available_volumes' => ['AT', 'NT', 'BM', 'DC', 'PGP']
+        ]);
+        throw new \Exception($errorMessage);
+    }
+    
+    /**
+     * Convert a reference like '1 Nefi 1:1' to a vector ID like 'BM-1-nefi-01-001'
+     */
+    private function referenceToId(string $reference): string
+    {
+        // Example: 'Mosíah 3:8' -> 'BM-mosiah-03-008'
+        $pattern = '/^((?:\d+\s+)?[\w\s]+?)\s+(\d+)(?::(\d+))?/u';
+        
+        Log::debug('Extracting book and reference', [
+            'reference' => $reference,
+            'pattern' => $pattern
+        ]);
+        
+        if (!preg_match($pattern, $reference, $matches)) {
+            throw new \Exception('Formato de referencia inválido. Formato esperado: "Libro 1:1" o "Libro 1"');
+        }
+        
+        $book = trim($matches[1]);
+        $chapter = $matches[2];
+        $verse = $matches[3] ?? '001'; // Default to verse 1 if not specified
+        
+        Log::debug('Extracted components', [
+            'book' => $book,
+            'chapter' => $chapter,
+            'verse' => $verse
+        ]);
+        
+        $volumeCode = $this->getVolumeCode($book);
+        
+        // Special handling for Book of Mormon books
+        if ($volumeCode === 'BM') {
+            // Format: BM-{book_slug}-{chapter_padded}-{verse_padded}
+            // Example: BM-mosiah-03-008 for Mosíah 3:8
+            
+            // Special case for Mosíah
+            $bookSlug = strtolower($this->normalizeText($book));
+            
+            // Format chapter and verse with leading zeros
+            $chapterPadded = str_pad($chapter, 2, '0', STR_PAD_LEFT);
+            $versePadded = str_pad($verse, 3, '0', STR_PAD_LEFT);
+            
+            $vectorId = sprintf('BM-%s-%s-%s', 
+                $bookSlug,
+                $chapterPadded,
+                $versePadded
+            );
+            
+            Log::debug('Generated Book of Mormon ID', [
+                'original_reference' => $reference,
+                'vector_id' => $vectorId,
+                'book_slug' => $bookSlug,
+                'chapter_padded' => $chapterPadded,
+                'verse_padded' => $versePadded
+            ]);
+            
+            return $vectorId;
+        }
+        
+        // Handle other volumes (Old Testament, New Testament, etc.)
+        $bookSlug = strtolower($this->normalizeText($book));
+        $chapter = str_pad($chapter, 2, '0', STR_PAD_LEFT);
+        $verse = str_pad($verse, 3, '0', STR_PAD_LEFT);
+        
+        return sprintf('%s-%s-%s-%s', $volumeCode, $bookSlug, $chapter, $verse);
+    }
+    /**
+     * Normalize book name to ID format (e.g., '1 Nefi' -> '1nephi')
      */
     private function normalizeBookName(string $book): string
     {
-        $book = mb_strtolower($book);
-        $book = iconv('UTF-8', 'ASCII//TRANSLIT', $book); // Remove accents
-        $book = preg_replace('/[^a-z0-9]/', '', $book); // Remove non-alphanumeric
-        return $book;
+        // First, normalize the text (lowercase, remove accents, etc.)
+        $book = $this->normalizeText($book);
+        
+        // Handle specific book name mappings
+        $bookMappings = [
+            '/^1\s*nephi/' => '1nephi',
+            '/^2\s*nephi/' => '2nephi',
+            '/^3\s*nephi/' => '3nephi',
+            '/^4\s*nephi/' => '4nephi',
+            '/^1\s*samuel/' => '1samuel',
+            '/^2\s*samuel/' => '2samuel',
+            '/^1\s*reyes/' => '1reyes',
+            '/^2\s*reyes/' => '2reyes',
+            '/^1\s*cronicas/' => '1cronicas',
+            '/^2\s*cronicas/' => '2cronicas',
+            '/^1\s*corintios/' => '1corintios',
+            '/^2\s*corintios/' => '2corintios',
+            '/^1\s*tesalonicenses/' => '1tesalonicenses',
+            '/^2\s*tesalonicenses/' => '2tesalonicenses',
+            '/^1\s*timoteo/' => '1timoteo',
+            '/^2\s*timoteo/' => '2timoteo',
+            '/^1\s*pedro/' => '1pedro',
+            '/^2\s*pedro/' => '2pedro',
+            '/^1\s*juan/' => '1juan',
+            '/^2\s*juan/' => '2juan',
+            '/^3\s*juan/' => '3juan',
+            '/^1\s*macabeos/' => '1macabeos',
+            '/^2\s*macabeos/' => '2macabeos'
+        ];
+        
+        foreach ($bookMappings as $pattern => $replacement) {
+            if (preg_match($pattern, $book)) {
+                return $replacement;
+            }
+        }
+        
+        // For books without numbers, just remove all non-alphanumeric characters
+        return preg_replace('/[^a-z0-9]/', '', $book);
     }
 
     public function getVectorByReference(string $reference, bool $includeValues = false): array
     {
         try {
+            Log::debug('Processing reference', ['original_reference' => $reference]);
+            
             // Convert reference to ID format (e.g., 'Génesis 6:10' -> 'AT-genesis-06-010')
             $vectorId = $this->referenceToId($reference);
+            Log::debug('Generated vector ID', ['vector_id' => $vectorId]);
             
             Log::info('Searching for vector by reference', [
                 'reference' => $reference,
