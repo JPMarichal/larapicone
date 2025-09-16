@@ -1,145 +1,111 @@
 # Laravel Google OAuth Application
 
-Una aplicación Laravel con autenticación social de Google usando Docker.
+Una aplicación Laravel con autenticación social de Google usando Docker, optimizada para rendimiento en entornos de desarrollo.
 
-## Características
+## 🚀 Características
 
 - ✅ Laravel 11 con PHP 8.2
 - ✅ Autenticación social con Google OAuth
-- ✅ Contenedores Docker para desarrollo
-- ✅ Base de datos MySQL en host
+- ✅ Contenedores Docker optimizados
+- ✅ Base de datos MySQL local (fuera de Docker)
 - ✅ Puerto 9003 para acceso desde host
 - ✅ Laravel Socialite integrado
+- ✅ Caché de configuración y rutas
+- ✅ Optimización de rendimiento
+- ✅ Logs configurados para producción
+- ✅ Variables de entorno seguras
 
-## Requisitos
+## 📋 Requisitos
 
-- Docker y Docker Compose
+- Docker y Docker Compose instalados
 - Cuenta de Google Developer Console
 - Puerto 9003 disponible
+- MySQL instalado localmente
+- PHP 8.2+ (solo para desarrollo local)
+- Composer (solo para desarrollo local)
 
-## Instalación
+## 🛠️ Configuración Inicial
 
-1. **Clonar el repositorio:**
-```bash
-git clone https://github.com/JPMarichal/larapicone.git
-cd larapicone
-```
+1. Clona el repositorio:
+   ```bash
+   git clone [url-del-repositorio]
+   cd larapicone
+   ```
 
-2. **Configurar variables de entorno:**
-```bash
-cp .env.example .env
-```
+2. Copia el archivo de entorno de ejemplo:
+   ```bash
+   cp .env.example .env
+   ```
 
-3. **Configurar Google OAuth:**
-   - Ve a [Google Cloud Console](https://console.cloud.google.com/)
-   - Crea un nuevo proyecto o selecciona uno existente
-   - Habilita la API de Google+
-   - Crea credenciales OAuth 2.0
-   - Configura las URIs de redirección: `http://localhost:9003/auth/google/callback`
+3. Genera una nueva clave de aplicación:
+   ```bash
+   php artisan key:generate
+   ```
 
-4. **Actualizar el archivo .env:**
-```env
-GOOGLE_CLIENT_ID=tu_google_client_id_aqui
-GOOGLE_CLIENT_SECRET=tu_google_client_secret_aqui
-GOOGLE_REDIRECT_URI=http://localhost:9003/auth/google/callback
-```
+4. Configura las credenciales de Google OAuth en `.env`:
+   ```
+   GOOGLE_CLIENT_ID=tu-google-client-id
+   GOOGLE_CLIENT_SECRET=tu-google-client-secret
+   GOOGLE_REDIRECT_URI=http://localhost:9003/auth/google/callback
+   ```
 
-5. **Construir y ejecutar los contenedores:**
-```bash
-docker-compose up --build -d
-```
+## 🐳 Configuración de Docker
 
-6. **Instalar dependencias:**
-```bash
-docker exec larapicone-app composer install
-```
+El archivo `docker-compose.yml` está configurado para:
+- Usar PHP 8.2 con extensiones necesarias
+- Montar el código con caché para mejor rendimiento
+- Conectarse a MySQL local en el host
+- Exponer el puerto 9003 para la aplicación
 
-7. **Ejecutar migraciones:**
-```bash
-docker exec larapicone-app php artisan migrate
-```
+## 🚀 Iniciar la Aplicación
 
-## Uso
+1. Inicia los contenedores:
+   ```bash
+   docker-compose up -d
+   ```
 
-1. **Acceder a la aplicación:**
-   - Abre tu navegador en `http://localhost:9003`
+2. Instala las dependencias de Composer:
+   ```bash
+   docker-compose exec app composer install
+   ```
 
-2. **Iniciar sesión:**
-   - Haz clic en "Login with Google"
-   - Autoriza la aplicación en Google
-   - Serás redirigido al dashboard
+3. Ejecuta las migraciones:
+   ```bash
+   docker-compose exec app php artisan migrate
+   ```
 
-3. **Dashboard:**
-   - Verás tu información de perfil de Google
-   - Podrás cerrar sesión
+4. Accede a la aplicación en:
+   ```
+   http://localhost:9003
+   ```
 
-## Estructura del Proyecto
+## 🔧 Optimizaciones de Rendimiento
 
-```
-├── app/
-│   ├── Http/Controllers/Auth/
-│   │   └── GoogleController.php     # Controlador OAuth
-│   └── Models/
-│       └── User.php                 # Modelo con campos Google
-├── database/migrations/
-│   └── *_add_google_fields_to_users_table.php
-├── resources/views/
-│   ├── welcome.blade.php            # Página principal
-│   └── dashboard.blade.php          # Dashboard autenticado
-├── routes/
-│   └── web.php                      # Rutas OAuth
-├── docker-compose.yml               # Configuración Docker
-├── Dockerfile                       # Imagen de la aplicación
-└── docker/nginx/nginx.conf          # Configuración Nginx
-```
+La aplicación incluye las siguientes optimizaciones:
+- Caché de configuración
+- Caché de rutas
+- Caché de vistas
+- Niveles de log optimizados
+- Volúmenes Docker con caché habilitada
 
-## Rutas Disponibles
+## 🔒 Seguridad
 
-- `GET /` - Página principal
-- `GET /auth/google` - Iniciar OAuth con Google
-- `GET /auth/google/callback` - Callback de Google
-- `GET /dashboard` - Dashboard (requiere autenticación)
-- `POST /logout` - Cerrar sesión
+- Las credenciales sensibles están en `.env`
+- Las cookies de sesión están aseguradas
+- Las contraseñas se hashean con Bcrypt
+- Solo se registran errores en producción
 
-## Comandos Útiles
+## 🐛 Solución de Problemas
 
-```bash
-# Ver logs de la aplicación
-docker-compose logs -f app
+Si encuentras problemas:
+1. Verifica que MySQL esté corriendo localmente
+2. Revisa los logs de Docker:
+   ```bash
+   docker-compose logs -f
+   ```
+3. Asegúrate de que el puerto 9003 no esté en uso
+4. Verifica que las credenciales de Google OAuth sean correctas
 
-# Acceder al contenedor
-docker exec -it larapicone-app bash
+## 📝 Licencia
 
-# Reiniciar contenedores
-docker-compose restart
-
-# Parar contenedores
-docker-compose down
-```
-
-## Configuración de Base de Datos
-
-La aplicación usa MySQL en un contenedor separado:
-- **Host:** localhost
-- **Puerto:** 3307
-- **Base de datos:** larapicone
-- **Usuario:** root
-- **Contraseña:** root
-
-## Troubleshooting
-
-1. **Error de conexión a base de datos:**
-   - Verifica que el contenedor MySQL esté ejecutándose
-   - Revisa las variables de entorno en `.env`
-
-2. **Error de Google OAuth:**
-   - Verifica las credenciales en Google Console
-   - Asegúrate de que la URI de redirección esté configurada correctamente
-
-3. **Puerto 9003 ocupado:**
-   - Cambia el puerto en `docker-compose.yml`
-   - Actualiza `APP_URL` y `GOOGLE_REDIRECT_URI` en `.env`
-
-## Licencia
-
-Este proyecto está bajo la licencia MIT.
+Este proyecto está bajo la [Licencia MIT](LICENSE).
