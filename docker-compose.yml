@@ -17,5 +17,33 @@ services:
       - "DB_DATABASE=larapicone"
       - "DB_USERNAME=root"
       - "DB_PASSWORD="
+      - "OLLAMA_BASE_URL=http://ollama:11434"
+    depends_on:
+      - ollama
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: larapicone-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    command: >
+      sh -c "ollama serve &
+             until ollama pull nomic-embed-text; do
+               echo 'Failed to pull nomic-embed-text, retrying in 5 seconds...';
+               sleep 5;
+             done && 
+             tail -f /dev/null"
+
+volumes:
+  ollama_data:

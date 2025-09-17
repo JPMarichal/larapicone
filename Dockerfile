@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y \
     unzip \
     libzip-dev \
     libpq-dev \
-    nginx
+    nginx \
+    iputils-ping \
+    net-tools
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -33,10 +35,20 @@ COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/storage
+    && chmod -R 755 /var/www/storage \
+    && chmod +x /var/www/docker/healthcheck.sh
 
 # Expose port 80 and start nginx
 EXPOSE 80
 
+# Set health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Copy healthcheck script and set as entrypoint
+COPY docker/healthcheck.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Start nginx and php-fpm
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["sh", "-c", "php-fpm & nginx -g 'daemon off;'"]
