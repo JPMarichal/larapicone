@@ -48,8 +48,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// Character search endpoint
-Route::post('/pinecone/search/character', [PineconeController::class, 'searchCharacter']);
+// Semantic search endpoint
+Route::post('/pinecone/search/semantic', [PineconeController::class, 'searchSemantic']);
 
 // Pinecone API Routes
 Route::prefix('pinecone')->group(function () {

@@ -115,7 +115,7 @@ class PineconeService
      * @return array
      * @throws \Exception
      */
-    public function semanticCharacterSearch(string $query, int $topK = 100, array $filters = []): array
+    public function semanticSearch(string $query, int $topK = 100, array $filters = []): array
     {
         try {
             Log::info('Performing semantic search with nomic-embed-text', [

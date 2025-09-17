@@ -17,7 +17,7 @@ $query = "¿Quién fue Melquisedec?";
 echo "=== Query: $query ===\n";
 
 try {
-    $result = $service->semanticCharacterSearch($query, 5);
+    $result = $service->semanticSearch($query, 5);
     
     echo "Search type: " . $result['search_type'] . "\n";
     echo "Results count: " . count($result['results']) . "\n\n";

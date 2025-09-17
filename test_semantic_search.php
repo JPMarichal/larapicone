@@ -13,13 +13,19 @@ try {
     
     // Test 1: Melquisedec query
     echo "=== Test 1: ¿Quién fue Melquisedec? ===\n";
-    $result1 = $service->semanticCharacterSearch('¿Quién fue Melquisedec?', 3);
-    echo "Search type: " . ($result1['search_type'] ?? 'unknown') . "\n";
-    echo "Results count: " . $result1['count'] . "\n";
+    $query = '¿Quién fue Melquisedec?';
+    $result = $service->semanticSearch($query, 5);
+    echo "Search type: " . ($result['search_type'] ?? 'unknown') . "\n";
+    echo "Results count: " . $result['count'] . "\n";
     
-    if (!empty($result1['results'])) {
-        foreach ($result1['results'] as $i => $result) {
+    if (!empty($result['results'])) {
+        foreach ($result['results'] as $i => $resultItem) {
             echo "Result " . ($i + 1) . ":\n";
+            echo "  Book: " . ($resultItem['libro'] ?? 'Unknown') . "\n";
+            echo "  Chapter: " . ($resultItem['capitulo'] ?? 'Unknown') . "\n";
+            echo "  Verse: " . ($resultItem['versiculo'] ?? 'Unknown') . "\n";
+            echo "  Score: " . round($resultItem['score'], 4) . "\n";
+            echo "  Content: " . substr($resultItem['contenido'], 0, 150) . "...\n\n";
             echo "  Book: " . ($result['libro'] ?? 'Unknown') . "\n";
             echo "  Chapter: " . ($result['capitulo'] ?? 'Unknown') . "\n";
             echo "  Verse: " . ($result['versiculo'] ?? 'Unknown') . "\n";

@@ -36,9 +36,9 @@ class PineconeController extends Controller
      */
     /**
      * @OA\Post(
-     *     path="/api/pinecone/search/character",
+     *     path="/api/pinecone/search/semantic",
      *     tags={"Scriptures"},
-     *     summary="Buscar información sobre un personaje bíblico",
+     *     summary="Realizar búsqueda semántica en las escrituras",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -84,11 +84,11 @@ class PineconeController extends Controller
      *     )
      * )
      */
-    public function searchCharacter(Request $request)
+    public function searchSemantic(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'query' => 'required|string|min:3|max:500',
-            'limit' => 'sometimes|integer|min:1|max:20',
+            'limit' => 'sometimes|integer|min:1|max:100',
             'filters' => 'sometimes|array',
             'filters.volume' => 'sometimes|string|in:BM,AT,NT,DyC,PdeGP',
         ]);
@@ -102,7 +102,7 @@ class PineconeController extends Controller
         }
 
         try {
-            $results = $this->pineconeService->semanticCharacterSearch(
+            $results = $this->pineconeService->semanticSearch(
                 $request->input('query'),
                 $request->input('limit', 5),
                 $request->input('filters', [])
