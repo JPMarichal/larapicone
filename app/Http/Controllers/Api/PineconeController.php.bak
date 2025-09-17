@@ -9,11 +9,26 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * @OA\Info(title="Pinecone Scripture API", version="1.0.0")
- * @OA\Server(url="http://localhost:8000")
- * @OA\Tag(name="Vectors")
- * @OA\Tag(name="Scriptures")
- */
+ * @OA\Info(
+ *     version="1.0.0",
+ *     title="Pinecone Scripture API",
+ *     description="API para búsqueda de versículos bíblicos usando Pinecone",
+ *     @OA\Contact(
+ *         email="soporte@ejemplo.com"
+ *     )
+ * )
+ * @OA\Server(
+ *     url="http://localhost:8000",
+ *     description="API Server"
+ * )
+ * @OA\Tag(
+ *     name="Vectors",
+ *     description="Operaciones con vectores"
+ * )
+ * @OA\Tag(
+ *     name="Scriptures",
+ *     description="Operaciones con referencias bíblicas"
+ * )
 
 class PineconeController extends Controller
 {
@@ -28,7 +43,15 @@ class PineconeController extends Controller
      * @OA\Get(
      *     path="/api/pinecone/debug",
      *     tags={"Vectors"},
-     *     @OA\Response(response=200, description="OK")
+     *     summary="Obtener información de depuración del índice Pinecone",
+     *     @OA\Response(
+     *         response=200,
+     *         description="Información de depuración del índice",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     )
      * )
      * 
      * @return \Illuminate\Http\JsonResponse
@@ -183,9 +206,38 @@ class PineconeController extends Controller
      * @OA\Post(
      *     path="/api/pinecone/vector/reference",
      *     tags={"Scriptures"},
-     *     @OA\Parameter(name="reference", in="query", required=true),
-     *     @OA\Parameter(name="include_values", in="query", required=false),
-     *     @OA\Response(response=200, description="OK")
+     *     summary="Obtener vector por referencia bíblica",
+     *     @OA\Parameter(
+     *         name="reference",
+     *         in="query",
+     *         required=true,
+     *         description="Referencia bíblica (ej: 'Juan 3:16')",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="include_values",
+     *         in="query",
+     *         required=false,
+     *         description="Incluir valores del vector en la respuesta",
+     *         @OA\Schema(type="boolean", default=false)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Vector encontrado",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Error de validación",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     )
      * )
      * 
      * @param Request $request
@@ -228,8 +280,50 @@ class PineconeController extends Controller
      * @OA\Post(
      *     path="/api/pinecone/vector/passage",
      *     tags={"Scriptures"},
-     *     @OA\Parameter(name="passage", in="query", required=true),
-     *     @OA\Response(response=200, description="OK")
+     *     summary="Obtener múltiples vectores por referencia de pasaje bíblico",
+     *     description="Obtiene los vectores para un rango de versículos. Ejemplos: 'Juan 1:1-3', '1 Nefi 3:7-8', 'Juan 1:1-3,14-15,20'",
+     *     @OA\Parameter(
+     *         name="passage",
+     *         in="query",
+     *         required=true,
+     *         description="Referencia bíblica (ej: 'Juan 1:1-3,14-15,20')",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Vectores encontrados",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="passage", type="string", example="Juan 1:1-3,14-15,20"),
+     *                 @OA\Property(property="verse_count", type="integer", example=6),
+     *                 @OA\Property(property="concatenated_text", type="string"),
+     *                 @OA\Property(property="verses", type="array",
+     *                     @OA\Items(type="object",
+     *                         @OA\Property(property="reference", type="string"),
+     *                         @OA\Property(property="vector_id", type="string"),
+     *                         @OA\Property(property="text", type="string"),
+     *                         @OA\Property(property="metadata", type="object")
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="errors", type="array", 
+     *                     @OA\Items(type="object",
+     *                         @OA\Property(property="reference", type="string"),
+     *                         @OA\Property(property="error", type="string")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Error de validación",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     )
      * )
      * 
      * @param Request $request

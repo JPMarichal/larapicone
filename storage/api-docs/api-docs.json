@@ -1,0 +1,137 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Pinecone Scripture API",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000"
+        }
+    ],
+    "paths": {
+        "/api/pinecone/debug": {
+            "get": {
+                "tags": [
+                    "Vectors"
+                ],
+                "operationId": "d9ea693c12dffba855147ce55399d1db",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/pinecone/query": {
+            "post": {
+                "tags": [
+                    "Vectors"
+                ],
+                "summary": "Consultar el índice Pinecone con un vector",
+                "operationId": "501d7c84dab4e71954aa0f0cbcec36cf",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "vector"
+                                ],
+                                "properties": {
+                                    "vector": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "top_k": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "filter": {
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultados de la consulta",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pinecone/vector/reference": {
+            "post": {
+                "tags": [
+                    "Scriptures"
+                ],
+                "operationId": "2d5dfbc8875eb5b519c21799253685f2",
+                "parameters": [
+                    {
+                        "name": "reference",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "name": "include_values",
+                        "in": "query",
+                        "required": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/pinecone/vector/passage": {
+            "post": {
+                "tags": [
+                    "Scriptures"
+                ],
+                "operationId": "451cea9a50c01555823bac1ff8162b5b",
+                "parameters": [
+                    {
+                        "name": "passage",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Vectors"
+        },
+        {
+            "name": "Scriptures"
+        }
+    ]
+}
