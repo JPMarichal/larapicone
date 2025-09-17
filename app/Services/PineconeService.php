@@ -637,6 +637,190 @@ class PineconeService
         
         throw new \Exception('No se pudo procesar la referencia de Declaración Oficial: ' . $reference);
     }
+
+    /**
+     * Get multiple vectors by passage reference
+     * Handles ranges like "Juan 1:1-3" and multiple references like "Juan 1:1-3, 14"
+     */
+    public function getVectorsByPassage(string $passage, bool $includeValues = false): array
+    {
+        try {
+            Log::info('Processing passage', ['passage' => $passage]);
+            
+            // Parse the passage into individual verse references
+            $verseReferences = $this->parsePassage($passage);
+            
+            Log::debug('Expanded verse references', [
+                'passage' => $passage,
+                'verse_count' => count($verseReferences),
+                'verses' => $verseReferences
+            ]);
+            
+            $verses = [];
+            $errors = [];
+            
+            // Get each verse using the existing getVectorByReference method
+            foreach ($verseReferences as $reference) {
+                try {
+                    $vector = $this->getVectorByReference($reference, $includeValues);
+                    $verses[] = [
+                        'reference' => $reference,
+                        'vector_id' => $vector['id'],
+                        'text' => $vector['metadata']['text'] ?? '',
+                        'metadata' => $vector['metadata'] ?? [],
+                        'values' => $includeValues ? ($vector['values'] ?? []) : null
+                    ];
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'reference' => $reference,
+                        'error' => $e->getMessage()
+                    ];
+                    Log::warning('Failed to get verse', [
+                        'reference' => $reference,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
+            // Concatenate all verse texts
+            $concatenatedText = implode(' ', array_column($verses, 'text'));
+            
+            $result = [
+                'passage' => $passage,
+                'verse_count' => count($verses),
+                'concatenated_text' => $concatenatedText,
+                'verses' => $verses
+            ];
+            
+            if (!empty($errors)) {
+                $result['errors'] = $errors;
+            }
+            
+            Log::info('Passage processing completed', [
+                'passage' => $passage,
+                'verse_count' => count($verses),
+                'error_count' => count($errors),
+                'text_length' => strlen($concatenatedText)
+            ]);
+            
+            return $result;
+            
+        } catch (\Exception $e) {
+            Log::error('Passage processing error: ' . $e->getMessage(), [
+                'passage' => $passage,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Parse passage reference into individual verse references
+     * Examples: 
+     * - "Juan 1:1-3" -> ["Juan 1:1", "Juan 1:2", "Juan 1:3"]
+     * - "Juan 1:1-3, 14" -> ["Juan 1:1", "Juan 1:2", "Juan 1:3", "Juan 1:14"]
+     * - "Juan 1:1, 3, 5-7" -> ["Juan 1:1", "Juan 1:3", "Juan 1:5", "Juan 1:6", "Juan 1:7"]
+     */
+    private function parsePassage(string $passage): array
+    {
+        $references = [];
+        
+        // Split by commas to handle multiple parts
+        $parts = array_map('trim', explode(',', $passage));
+        
+        foreach ($parts as $part) {
+            Log::debug('Processing passage part', ['part' => $part]);
+            
+            // Check if this part contains a range (e.g., "Juan 1:1-3" or just "5-7")
+            if (preg_match('/^(.+?)(\d+):(\d+)-(\d+)$/u', $part, $matches)) {
+                // Full reference with range: "Juan 1:1-3"
+                $book = trim($matches[1]);
+                $chapter = $matches[2];
+                $startVerse = (int)$matches[3];
+                $endVerse = (int)$matches[4];
+                
+                for ($verse = $startVerse; $verse <= $endVerse; $verse++) {
+                    $references[] = "{$book} {$chapter}:{$verse}";
+                }
+            } elseif (preg_match('/^(\d+)-(\d+)$/u', $part, $matches)) {
+                // Just verse range: "5-7" (assumes same book and chapter as previous)
+                $startVerse = (int)$matches[1];
+                $endVerse = (int)$matches[2];
+                
+                // Get book and chapter from the first reference if available
+                if (!empty($references)) {
+                    $lastRef = end($references);
+                    if (preg_match('/^(.+?)(\d+):(\d+)$/u', $lastRef, $lastMatches)) {
+                        $book = trim($lastMatches[1]);
+                        $chapter = $lastMatches[2];
+                        
+                        for ($verse = $startVerse; $verse <= $endVerse; $verse++) {
+                            $references[] = "{$book} {$chapter}:{$verse}";
+                        }
+                    }
+                } else {
+                    throw new \Exception("No se puede procesar el rango '{$part}' sin una referencia base");
+                }
+            } elseif (preg_match('/^(.+?)(\d+):(\d+)$/u', $part, $matches)) {
+                // Single verse: "Juan 1:1"
+                $references[] = $part;
+            } elseif (preg_match('/^(\d+)$/u', $part, $matches)) {
+                // Just verse number: "14" (assumes same book and chapter as previous)
+                $verse = $matches[1];
+                
+                // Get book and chapter from the last reference if available
+                if (!empty($references)) {
+                    $lastRef = end($references);
+                    if (preg_match('/^(.+?)(\d+):(\d+)$/u', $lastRef, $lastMatches)) {
+                        $book = trim($lastMatches[1]);
+                        $chapter = $lastMatches[2];
+                        $references[] = "{$book} {$chapter}:{$verse}";
+                    }
+                } else {
+                    throw new \Exception("No se puede procesar el versículo '{$part}' sin una referencia base");
+                }
+            } else {
+                throw new \Exception("Formato de pasaje inválido: '{$part}'");
+            }
+        }
+        
+        // Remove duplicates and sort
+        $references = array_unique($references);
+        
+        // Sort references by chapter and verse
+        usort($references, function($a, $b) {
+            if (preg_match('/^(.+?)(\d+):(\d+)$/u', $a, $matchesA) && 
+                preg_match('/^(.+?)(\d+):(\d+)$/u', $b, $matchesB)) {
+                
+                $bookA = trim($matchesA[1]);
+                $chapterA = (int)$matchesA[2];
+                $verseA = (int)$matchesA[3];
+                
+                $bookB = trim($matchesB[1]);
+                $chapterB = (int)$matchesB[2];
+                $verseB = (int)$matchesB[3];
+                
+                // First compare books
+                if ($bookA !== $bookB) {
+                    return strcmp($bookA, $bookB);
+                }
+                
+                // Then compare chapters
+                if ($chapterA !== $chapterB) {
+                    return $chapterA - $chapterB;
+                }
+                
+                // Finally compare verses
+                return $verseA - $verseB;
+            }
+            
+            return strcmp($a, $b);
+        });
+        
+        return $references;
+    }
+
     /**
      * Normalize book name to ID format (e.g., '1 Nefi' -> '1nephi')
      */

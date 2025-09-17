@@ -190,6 +190,45 @@ class PineconeController extends Controller
     }
 
     /**
+     * Get multiple vectors by passage reference
+     * Handles ranges like "Juan 1:1-3" and multiple references like "Juan 1:1-3, 14"
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getVectorsByPassage(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'passage' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $passage = $request->input('passage');
+            $includeValues = false; // Always false by default
+            
+            $result = $this->pineconeService->getVectorsByPassage($passage, $includeValues);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Delete vectors by ID or filter
      *
      * @param Request $request

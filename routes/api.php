@@ -64,6 +64,9 @@ Route::prefix('pinecone')->group(function () {
     // Get vector by reference
     Route::post('/vector/reference', [PineconeController::class, 'getVectorByReference']);
     
+    // Get vectors by passage
+    Route::post('/vector/passage', [PineconeController::class, 'getVectorsByPassage']);
+    
     // Delete vectors
     Route::delete('/delete', [PineconeController::class, 'delete']);
 });
