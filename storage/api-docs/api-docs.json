@@ -15,6 +15,7 @@
                 "tags": [
                     "Vectors"
                 ],
+                "summary": "Obtener información de depuración del servicio Pinecone",
                 "operationId": "d9ea693c12dffba855147ce55399d1db",
                 "responses": {
                     "200": {
@@ -85,6 +86,7 @@
                 "tags": [
                     "Scriptures"
                 ],
+                "summary": "Obtener vector por referencia bíblica",
                 "operationId": "2d5dfbc8875eb5b519c21799253685f2",
                 "parameters": [
                     {
@@ -110,6 +112,7 @@
                 "tags": [
                     "Scriptures"
                 ],
+                "summary": "Obtener vectores por pasaje bíblico (rangos y múltiples referencias)",
                 "operationId": "451cea9a50c01555823bac1ff8162b5b",
                 "parameters": [
                     {

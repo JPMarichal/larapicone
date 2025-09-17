@@ -28,6 +28,7 @@ class PineconeController extends Controller
      * @OA\Get(
      *     path="/api/pinecone/debug",
      *     tags={"Vectors"},
+     *     summary="Obtener información de depuración del servicio Pinecone",
      *     @OA\Response(response=200, description="OK")
      * )
      * 
@@ -183,6 +184,7 @@ class PineconeController extends Controller
      * @OA\Post(
      *     path="/api/pinecone/vector/reference",
      *     tags={"Scriptures"},
+     *     summary="Obtener vector por referencia bíblica",
      *     @OA\Parameter(name="reference", in="query", required=true),
      *     @OA\Parameter(name="include_values", in="query", required=false),
      *     @OA\Response(response=200, description="OK")
@@ -228,6 +230,7 @@ class PineconeController extends Controller
      * @OA\Post(
      *     path="/api/pinecone/vector/passage",
      *     tags={"Scriptures"},
+     *     summary="Obtener vectores por pasaje bíblico (rangos y múltiples referencias)",
      *     @OA\Parameter(name="passage", in="query", required=true),
      *     @OA\Response(response=200, description="OK")
      * )
