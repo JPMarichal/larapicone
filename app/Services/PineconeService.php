@@ -2,14 +2,9 @@
 
 namespace App\Services;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
-
-// Define CURL_SSLVERSION_TLSv1_2 if not defined
-if (!defined('CURL_SSLVERSION_TLSv1_2')) {
-    define('CURL_SSLVERSION_TLSv1_2', 6);
-}
+use GuzzleHttp\Client;
+use Exception;
 
 class PineconeService
 {
@@ -18,14 +13,13 @@ class PineconeService
     protected string $environment;
     protected string $index;
     protected string $namespace;
-    protected int $timeout;
 
     /**
-     * Get the HTTP client instance
+     * Get the Pinecone client instance
      * 
-     * @return \GuzzleHttp\Client
+     * @return \Probots\Pinecone\Client
      */
-    public function getClient(): Client
+    public function getClient(): PineconeClient
     {
         return $this->client;
     }
@@ -43,20 +37,45 @@ class PineconeService
             $statsResponse = $this->client->get('describe_index_stats');
             $stats = json_decode($statsResponse->getBody()->getContents(), true);
             
-            // Get list of vectors (just the first few)
+            // Get list of vectors with metadata
             $listResponse = $this->client->post('vectors/list', [
                 'json' => [
                     'namespace' => $this->namespace,
                     'includeMetadata' => true,
-                    'limit' => 5  // Just get a few for debugging
+                    'limit' => 10  // Get more samples for better debugging
                 ]
             ]);
             
             $listResult = json_decode($listResponse->getBody()->getContents(), true);
             
+            // Get sample vectors with different filters to understand the data structure
+            $sampleQueries = [
+                'character_exists' => $this->query(array_fill(0, 768, 0), 3, ['character' => ['$exists' => true]]),
+                'melquisedec' => $this->query(array_fill(0, 768, 0), 3, ['character' => ['$eq' => 'Melquisedec']]),
+                'any_character' => $this->query(array_fill(0, 768, 0), 3, []), // No filter
+            ];
+            
+            // Get a list of unique metadata keys from sample vectors
+            $metadataKeys = [];
+            if (!empty($listResult['vectors'])) {
+                foreach ($listResult['vectors'] as $vector) {
+                    if (isset($vector['metadata'])) {
+                        $metadataKeys = array_merge($metadataKeys, array_keys($vector['metadata']));
+                    }
+                }
+                $metadataKeys = array_values(array_unique($metadataKeys));
+            }
+            
             return [
                 'stats' => $stats,
-                'sample_vectors' => $listResult['vectors'] ?? []
+                'metadata_keys' => $metadataKeys,
+                'sample_vectors' => $listResult['vectors'] ?? [],
+                'sample_queries' => $sampleQueries,
+                'config' => [
+                    'namespace' => $this->namespace,
+                    'index' => $this->index,
+                    'environment' => $this->environment
+                ]
             ];
         } catch (\Exception $e) {
             Log::error('Pinecone debug error: ' . $e->getMessage());
@@ -88,31 +107,226 @@ class PineconeService
     }
 
     /**
-     * Query the Pinecone index for similar vectors
+     * Perform semantic search using vector similarity
      *
-     * @param array $vector
-     * @param int $topK
-     * @param array $filter
+     * @param string $query The natural language query
+     * @param int $topK Number of results to return
+     * @param array $filters Additional filters to apply
      * @return array
      * @throws \Exception
      */
-    public function query(array $vector, int $topK = 5, array $filter = []): array
+    public function semanticCharacterSearch(string $query, int $topK = 100, array $filters = []): array
     {
         try {
-            $response = $this->client->post('query', [
-                'json' => [
-                    'vector' => $vector,
-                    'topK' => $topK,
-                    'includeMetadata' => true,
-                    'includeValues' => false,
-                    'namespace' => $this->namespace,
-                    'filter' => $filter,
+            Log::info('Performing semantic search with nomic-embed-text', [
+                'query' => $query,
+                'topK' => $topK,
+                'filters' => $filters
+            ]);
+            
+            // Generate embedding for the query using Ollama nomic-embed-text model
+            $queryVector = $this->generateOllamaEmbedding($query);
+            
+            // Use traditional Pinecone query endpoint
+            $response = $this->query($queryVector, $topK, $filters);
+            
+            if (!isset($response['matches'])) {
+                Log::warning('No matches found in Pinecone response', ['response' => $response]);
+                return [
+                    'query' => $query,
+                    'results' => [],
+                    'count' => 0,
+                    'search_type' => 'semantic_nomic'
+                ];
+            }
+            
+            // Transform Pinecone matches to our expected format
+            $results = [];
+            foreach ($response['matches'] as $match) {
+                $metadata = $match['metadata'] ?? [];
+                
+                // Log the metadata structure for debugging
+                Log::debug('Match metadata structure', [
+                    'match_id' => $match['id'],
+                    'metadata_keys' => array_keys($metadata),
+                    'metadata' => $metadata
+                ]);
+                
+                $results[] = [
+                    'id' => $match['id'],
+                    'score' => $match['score'],
+                    'metadata' => $metadata,
+                    'libro' => $metadata['libro'] ?? $metadata['book'] ?? '',
+                    'capitulo' => $metadata['capitulo'] ?? $metadata['chapter'] ?? '',
+                    'versiculo' => $metadata['versiculo'] ?? $metadata['verse'] ?? '',
+                    'contenido' => $metadata['contenido'] ?? $metadata['content'] ?? $metadata['text'] ?? ''
+                ];
+            }
+            
+            Log::info('Semantic search completed successfully', [
+                'query' => $query,
+                'results_count' => count($results),
+                'top_score' => $results[0]['score'] ?? 0
+            ]);
+            
+            return [
+                'query' => $query,
+                'results' => $results,
+                'count' => count($results),
+                'search_type' => 'semantic_nomic'
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Semantic search error: ' . $e->getMessage());
+            throw new \Exception('Error performing semantic search: ' . $e->getMessage(), 0, $e);
+        }
+    }
+    
+    /**
+     * Generate embedding using Ollama with nomic-embed-text model (matches stored vectors)
+     *
+     * @param string $text
+     * @return array
+     */
+    protected function generateOllamaEmbedding(string $text): array
+    {
+        try {
+            // Use Ollama API for embeddings
+            $ollamaClient = new Client([
+                'base_uri' => config('services.ollama.base_url'),
+                'headers' => [
+                    'Content-Type' => 'application/json',
                 ],
+                'timeout' => 30,
             ]);
 
-            return json_decode($response->getBody()->getContents(), true);
-        } catch (GuzzleException $e) {
-            Log::error('Pinecone query error: ' . $e->getMessage());
+            $response = $ollamaClient->post('/api/embeddings', [
+                'json' => [
+                    'model' => config('services.ollama.embed_model'),
+                    'prompt' => $text
+                ]
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+            
+            if (isset($data['embedding']) && is_array($data['embedding'])) {
+                Log::info('Generated Ollama embedding successfully', [
+                    'text_length' => strlen($text),
+                    'embedding_dimensions' => count($data['embedding']),
+                    'model' => config('services.ollama.embed_model')
+                ]);
+                return $data['embedding'];
+            }
+
+            Log::warning('Ollama API response missing embedding, falling back');
+            return $this->generateFallbackEmbedding($text);
+
+        } catch (\Exception $e) {
+            Log::warning('Ollama embedding failed, using fallback: ' . $e->getMessage());
+            return $this->generateFallbackEmbedding($text);
+        }
+    }
+
+    /**
+     * Generate embedding vector for a text query using bag-of-words approach
+     *
+     * @param string $text
+     * @return array
+     */
+    protected function generateFallbackEmbedding(string $text): array
+    {
+        // Convert text to lowercase and remove punctuation
+        $text = strtolower(trim(preg_replace('/[^\p{L}\p{N}\s]/u', '', $text)));
+        
+        // Split into words and count frequencies
+        $words = preg_split('/\s+/', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $wordCounts = array_count_values($words);
+        
+        // Create a simple bag-of-words vector with 768 dimensions
+        $vector = array_fill(0, 768, 0);
+        
+        // Simple hashing trick to map words to vector indices
+        foreach ($wordCounts as $word => $count) {
+            $index = abs(crc32($word)) % 768;
+            $vector[$index] += $count;
+        }
+        
+        // Normalize the vector to unit length
+        $length = sqrt(array_sum(array_map(function($x) { return $x * $x; }, $vector)));
+        if ($length > 0) {
+            $vector = array_map(function($x) use ($length) { 
+                return $x / $length; 
+            }, $vector);
+        }
+        
+        return $vector;
+    }
+
+    public function query(array $vector, int $topK = 100, array $filter = []): array
+    {
+        try {
+            $requestData = [
+                'vector' => $vector,
+                'topK' => $topK,
+                'includeMetadata' => true,
+                'includeValues' => false,
+                'namespace' => $this->namespace,
+            ];
+
+            // Only add filter if it's not empty
+            if (!empty($filter)) {
+                $requestData['filter'] = $filter;
+            }
+
+            // Log the request data for debugging
+            Log::debug('Pinecone query request', [
+                'vector_size' => count($vector),
+                'topK' => $topK,
+                'filter' => $filter,
+                'namespace' => $this->namespace
+            ]);
+
+            $response = $this->client->post('query', [
+                'json' => $requestData,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ]
+            ]);
+
+            $result = json_decode($response->getBody()->getContents(), true);
+            
+            // Log the response for debugging
+            Log::debug('Pinecone query response', [
+                'status' => $response->getStatusCode(),
+                'matches_count' => count($result['matches'] ?? []),
+                'matches' => array_map(function($match) {
+                    return [
+                        'id' => $match['id'] ?? null,
+                        'score' => $match['score'] ?? null,
+                        'metadata_keys' => array_keys($match['metadata'] ?? [])
+                    ];
+                }, $result['matches'] ?? [])
+            ]);
+
+            return $result;
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $response = $e->getResponse();
+            $errorBody = $response ? $response->getBody()->getContents() : 'No response body';
+            Log::error('Pinecone query error', [
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'response' => $errorBody,
+                'request' => [
+                    'vector_size' => count($vector),
+                    'topK' => $topK,
+                    'filter' => $filter,
+                    'namespace' => $this->namespace
+                ]
+            ]);
+            throw new \Exception('Error querying Pinecone: ' . $e->getMessage() . ' - ' . $errorBody, 0, $e);
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in Pinecone query: ' . $e->getMessage());
             throw new \Exception('Error querying Pinecone: ' . $e->getMessage(), 0, $e);
         }
     }

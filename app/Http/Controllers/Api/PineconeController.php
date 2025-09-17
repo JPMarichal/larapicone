@@ -34,6 +34,106 @@ class PineconeController extends Controller
      * 
      * @return \Illuminate\Http\JsonResponse
      */
+    /**
+     * @OA\Post(
+     *     path="/api/pinecone/search/character",
+     *     tags={"Scriptures"},
+     *     summary="Buscar información sobre un personaje bíblico",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"query"},
+     *             @OA\Property(property="query", type="string", example="¿Quién fue Melquisedec?"),
+     *             @OA\Property(property="limit", type="integer", example=5, description="Número máximo de resultados a devolver"),
+     *             @OA\Property(
+     *                 property="filters",
+     *                 type="object",
+     *                 @OA\Property(property="volume", type="string", example="BM", description="Filtrar por volumen: 'BM' (Libro de Mormón), 'AT' (Antiguo Testamento), 'NT' (Nuevo Testamento), 'DyC' (Doctrina y Convenios), 'PdeGP' (Perla de Gran Precio)")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Resultados de la búsqueda",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="query", type="string", example="¿Quién fue Melquisedec?"),
+     *             @OA\Property(property="count", type="integer", example=5),
+     *             @OA\Property(
+     *                 property="results",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="reference", type="string", example="Génesis 14:18"),
+     *                     @OA\Property(property="text", type="string", example="Entonces Melquisedec, rey de Salem, sacó pan y vino..."),
+     *                     @OA\Property(property="score", type="number", format="float", example=0.95),
+     *                     @OA\Property(property="character", type="string", example="Melquisedec"),
+     *                     @OA\Property(property="context", type="string", example="Melquisedec bendice a Abraham")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Error de validación",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="El campo query es obligatorio"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     )
+     * )
+     */
+    public function searchCharacter(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'query' => 'required|string|min:3|max:500',
+            'limit' => 'sometimes|integer|min:1|max:20',
+            'filters' => 'sometimes|array',
+            'filters.volume' => 'sometimes|string|in:BM,AT,NT,DyC,PdeGP',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error de validación',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $results = $this->pineconeService->semanticCharacterSearch(
+                $request->input('query'),
+                $request->input('limit', 5),
+                $request->input('filters', [])
+            );
+
+            return response()->json([
+                'success' => true,
+                'query' => $results['query'],
+                'count' => $results['count'],
+                'results' => $results['results']
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al realizar la búsqueda: ' . $e->getMessage(),
+                'error' => config('app.debug') ? $e->getTraceAsString() : null
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pinecone/debug",
+     *     tags={"Vectors"},
+     *     summary="Obtener información de depuración del servicio Pinecone",
+     *     @OA\Response(response=200, description="OK")
+     * )
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function debug()
     {
         try {
