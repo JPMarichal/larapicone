@@ -32,14 +32,36 @@ Una aplicación Laravel con autenticación social de Google usando Docker, optim
    cd larapicone
    ```
 
-2. Copia el archivo de entorno de ejemplo:
-   ```bash
-   cp .env.example .env
+2. Crea un nuevo archivo `.env` con la configuración necesaria. Asegúrate de incluir las siguientes variables:
+   ```
+   APP_NAME=Laravel
+   APP_ENV=local
+   APP_KEY=
+   APP_DEBUG=true
+   APP_URL=http://localhost:9003
+   
+   # Configuración de base de datos
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=larapicone
+   DB_USERNAME=root
+   DB_PASSWORD=
+   
+   # Configuración de Pinecone
+   PINECONE_API_KEY=tu-api-key
+   PINECONE_ENVIRONMENT=gcp-starter
+   PINECONE_INDEX=escrituras
+   PINECONE_NAMESPACE=es
+   
+   # Configuración de Ollama
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_EMBED_MODEL=nomic-embed-text
    ```
 
-3. Genera una nueva clave de aplicación:
+3. Genera una nueva clave de aplicación segura:
    ```bash
-   php artisan key:generate
+   php artisan key:generate --ansi
    ```
 
 4. Configura las credenciales de Google OAuth en `.env`:
