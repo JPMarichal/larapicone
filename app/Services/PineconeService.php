@@ -9,74 +9,83 @@ use Exception;
 class PineconeService
 {
     protected Client $client;
+    protected Client $ollamaClient;
     protected string $apiKey;
     protected string $environment;
     protected string $index;
     protected string $namespace;
+    protected int $timeout;
 
     /**
      * Get the Pinecone client instance
      * 
      * @return \Probots\Pinecone\Client
      */
-    public function getClient(): PineconeClient
+    /**
+     * Get the Pinecone client instance
+     * 
+     * @return \GuzzleHttp\Client
+     */
+    public function getClient(): \GuzzleHttp\Client
     {
         return $this->client;
     }
-
+    
     /**
-     * Get debug information about the Pinecone index
+     * Get debug information about the Pinecone service
      * 
      * @return array
-     * @throws \Exception
      */
     public function getDebugInfo(): array
     {
+        $result = [
+            'pinecone' => [
+                'api_key_configured' => !empty($this->apiKey),
+                'environment' => $this->environment,
+                'index' => $this->index,
+                'namespace' => $this->namespace,
+                'timeout' => $this->timeout,
+            ],
+            'ollama' => [
+                'base_url' => config('services.ollama.base_url', 'http://localhost:11434/'),
+                'embed_model' => config('services.ollama.embed_model', 'nomic-embed-text'),
+                'embeddings_endpoint' => config('services.ollama.embeddings_endpoint', '/api/embeddings'),
+            ],
+            'environment' => [
+                'app_env' => config('app.env'),
+                'app_debug' => config('app.debug'),
+            ]
+        ];
+
         try {
             // Get index stats
             $statsResponse = $this->client->get('describe_index_stats');
-            $stats = json_decode($statsResponse->getBody()->getContents(), true);
+            $result['pinecone']['stats'] = json_decode($statsResponse->getBody()->getContents(), true);
             
-            // Get list of vectors with metadata
+            // Get list of vectors with metadata (limited to 5 for performance)
             $listResponse = $this->client->post('vectors/list', [
                 'json' => [
                     'namespace' => $this->namespace,
                     'includeMetadata' => true,
-                    'limit' => 10  // Get more samples for better debugging
+                    'limit' => 5
                 ]
             ]);
             
             $listResult = json_decode($listResponse->getBody()->getContents(), true);
             
-            // Get sample vectors with different filters to understand the data structure
-            $sampleQueries = [
-                'character_exists' => $this->query(array_fill(0, 768, 0), 3, ['character' => ['$exists' => true]]),
-                'melquisedec' => $this->query(array_fill(0, 768, 0), 3, ['character' => ['$eq' => 'Melquisedec']]),
-                'any_character' => $this->query(array_fill(0, 768, 0), 3, []), // No filter
-            ];
-            
             // Get a list of unique metadata keys from sample vectors
             $metadataKeys = [];
             if (!empty($listResult['vectors'])) {
+                $result['sample_vectors'] = $listResult['vectors'];
                 foreach ($listResult['vectors'] as $vector) {
                     if (isset($vector['metadata'])) {
                         $metadataKeys = array_merge($metadataKeys, array_keys($vector['metadata']));
                     }
                 }
-                $metadataKeys = array_values(array_unique($metadataKeys));
+                $result['metadata_keys'] = array_values(array_unique($metadataKeys));
             }
             
-            return [
-                'stats' => $stats,
-                'metadata_keys' => $metadataKeys,
-                'sample_vectors' => $listResult['vectors'] ?? [],
-                'sample_queries' => $sampleQueries,
-                'config' => [
-                    'namespace' => $this->namespace,
-                    'index' => $this->index,
-                    'environment' => $this->environment
-                ]
-            ];
+            return $result;
         } catch (\Exception $e) {
             Log::error('Pinecone debug error: ' . $e->getMessage());
             throw new \Exception('Error getting debug info from Pinecone: ' . $e->getMessage(), 0, $e);
@@ -104,6 +113,13 @@ class PineconeService
             'http_errors' => true, // Enable HTTP errors
             'debug' => false, // Disable debug to avoid output issues
         ]);
+        
+        // Initialize Ollama client if configured
+        $this->ollamaClient = new Client([
+            'base_uri' => config('services.ollama.base_url', 'http://localhost:11434/'),
+            'timeout' => $this->timeout,
+            'http_errors' => false,
+        ]);
     }
 
     /**
@@ -115,71 +131,126 @@ class PineconeService
      * @return array
      * @throws \Exception
      */
-    public function semanticSearch(string $query, int $topK = 100, array $filters = []): array
+    /**
+     * Perform semantic search using Ollama embeddings
+     * 
+     * @param string $query The search query
+     * @param int $topK Number of results to return
+     * @param array $filters Filters to apply to the search
+     * @return array Search results
+     */
+    public function semanticSearch(string $query, int $topK = 10, array $filters = []): array
     {
+        $startTime = microtime(true);
+        
         try {
-            Log::info('Performing semantic search with nomic-embed-text', [
+            Log::info('Starting semantic search', [
                 'query' => $query,
                 'topK' => $topK,
                 'filters' => $filters
             ]);
             
-            // Generate embedding for the query using Ollama nomic-embed-text model
+            // Generate embedding for the query
             $queryVector = $this->generateOllamaEmbedding($query);
             
-            // Use traditional Pinecone query endpoint
-            $response = $this->query($queryVector, $topK, $filters);
+            if (empty($queryVector)) {
+                throw new \Exception('Failed to generate embedding for the query');
+            }
+            
+            // Build the filter for Pinecone
+            $pineconeFilter = [];
+            if (!empty($filters['volume'])) {
+                $pineconeFilter['volume'] = ['$eq' => $filters['volume']];
+            }
+            
+            // Execute the query
+            $response = $this->query($queryVector, $topK, $pineconeFilter);
             
             if (!isset($response['matches'])) {
-                Log::warning('No matches found in Pinecone response', ['response' => $response]);
+                Log::warning('Invalid response format from Pinecone', ['response' => $response]);
                 return [
                     'query' => $query,
                     'results' => [],
                     'count' => 0,
-                    'search_type' => 'semantic_nomic'
+                    'search_type' => 'semantic',
+                    'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2)
                 ];
             }
             
-            // Transform Pinecone matches to our expected format
+            // Process and format results
             $results = [];
             foreach ($response['matches'] as $match) {
                 $metadata = $match['metadata'] ?? [];
+                $score = $match['score'] ?? 0;
                 
-                // Log the metadata structure for debugging
-                Log::debug('Match metadata structure', [
-                    'match_id' => $match['id'],
-                    'metadata_keys' => array_keys($metadata),
-                    'metadata' => $metadata
-                ]);
+                // Skip results with very low scores
+                if ($score < 0.1) {
+                    continue;
+                }
                 
                 $results[] = [
                     'id' => $match['id'],
-                    'score' => $match['score'],
-                    'metadata' => $metadata,
-                    'libro' => $metadata['libro'] ?? $metadata['book'] ?? '',
-                    'capitulo' => $metadata['capitulo'] ?? $metadata['chapter'] ?? '',
-                    'versiculo' => $metadata['versiculo'] ?? $metadata['verse'] ?? '',
-                    'contenido' => $metadata['contenido'] ?? $metadata['content'] ?? $metadata['text'] ?? ''
+                    'reference' => $this->formatReference($metadata),
+                    'text' => $metadata['contenido'] ?? $metadata['content'] ?? $metadata['text'] ?? '',
+                    'score' => $score,
+                    'metadata' => $metadata
                 ];
             }
             
-            Log::info('Semantic search completed successfully', [
+            // Sort by score in descending order
+            usort($results, function($a, $b) {
+                return $b['score'] <=> $a['score'];
+            });
+            
+            Log::info('Semantic search completed', [
                 'query' => $query,
                 'results_count' => count($results),
-                'top_score' => $results[0]['score'] ?? 0
+                'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2)
             ]);
             
             return [
                 'query' => $query,
                 'results' => $results,
                 'count' => count($results),
-                'search_type' => 'semantic_nomic'
+                'search_type' => 'semantic',
+                'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2)
             ];
             
         } catch (\Exception $e) {
-            Log::error('Semantic search error: ' . $e->getMessage());
-            throw new \Exception('Error performing semantic search: ' . $e->getMessage(), 0, $e);
+            Log::error('Semantic search failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return [
+                'query' => $query,
+                'results' => [],
+                'count' => 0,
+                'error' => $e->getMessage(),
+                'search_type' => 'semantic',
+                'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2)
+            ];
         }
+    }
+    
+    /**
+     * Format a reference from metadata
+     * 
+     * @param array $metadata
+     * @return string
+     */
+    protected function formatReference(array $metadata): string
+    {
+        $book = $metadata['libro'] ?? $metadata['book'] ?? '';
+        $chapter = $metadata['capitulo'] ?? $metadata['chapter'] ?? '';
+        $verse = $metadata['versiculo'] ?? $metadata['verse'] ?? '';
+        
+        $reference = $book;
+        $reference .= $chapter ? " $chapter" : '';
+        $reference .= $verse ? ":$verse" : '';
+        
+        return trim($reference);
     }
     
     /**
@@ -191,38 +262,45 @@ class PineconeService
     protected function generateOllamaEmbedding(string $text): array
     {
         try {
-            // Use Ollama API for embeddings
-            $ollamaClient = new Client([
-                'base_uri' => config('services.ollama.base_url'),
-                'headers' => [
-                    'Content-Type' => 'application/json',
+            $model = config('services.ollama.embed_model', 'nomic-embed-text');
+            $endpoint = config('services.ollama.embeddings_endpoint', '/api/embeddings');
+            
+            $response = $this->ollamaClient->post($endpoint, [
+                'json' => [
+                    'model' => $model,
+                    'prompt' => $text
                 ],
                 'timeout' => 30,
-            ]);
-
-            $response = $ollamaClient->post('/api/embeddings', [
-                'json' => [
-                    'model' => config('services.ollama.embed_model'),
-                    'prompt' => $text
+                'headers' => [
+                    'Content-Type' => 'application/json',
                 ]
             ]);
 
-            $data = json_decode($response->getBody()->getContents(), true);
-            
-            if (isset($data['embedding']) && is_array($data['embedding'])) {
-                Log::info('Generated Ollama embedding successfully', [
-                    'text_length' => strlen($text),
-                    'embedding_dimensions' => count($data['embedding']),
-                    'model' => config('services.ollama.embed_model')
-                ]);
-                return $data['embedding'];
+            if ($response->getStatusCode() !== 200) {
+                throw new \Exception("Ollama API returned status code: " . $response->getStatusCode());
             }
 
-            Log::warning('Ollama API response missing embedding, falling back');
-            return $this->generateFallbackEmbedding($text);
+            $data = json_decode($response->getBody()->getContents(), true);
+            
+            if (empty($data['embedding']) || !is_array($data['embedding'])) {
+                throw new \Exception('Invalid embedding format in Ollama response');
+            }
+            
+            Log::debug('Generated Ollama embedding', [
+                'text_length' => strlen($text),
+                'embedding_dimensions' => count($data['embedding']),
+                'model' => $model
+            ]);
+            
+            return $data['embedding'];
 
         } catch (\Exception $e) {
-            Log::warning('Ollama embedding failed, using fallback: ' . $e->getMessage());
+            Log::error('Ollama embedding generation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Fall back to the simpler embedding method
             return $this->generateFallbackEmbedding($text);
         }
     }
