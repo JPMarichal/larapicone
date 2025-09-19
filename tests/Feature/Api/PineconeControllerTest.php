@@ -7,6 +7,7 @@ use App\Services\PineconeService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\Test;
 
 class PineconeControllerTest extends TestCase
 {
@@ -20,7 +21,7 @@ class PineconeControllerTest extends TestCase
         $this->pineconeServiceMock = $this->mock(PineconeService::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_debug_info()
     {
         $debugInfo = [
@@ -94,7 +95,7 @@ class PineconeControllerTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_invalid_semantic_search_request()
     {
         $response = $this->postJson('/api/pinecone/search/semantic', [
@@ -105,7 +106,7 @@ class PineconeControllerTest extends TestCase
             ->assertJsonValidationErrors(['query']);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_vector_by_id()
     {
         $vectorId = 'AT-genesis-01-001';
@@ -135,7 +136,7 @@ class PineconeControllerTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_vector_by_reference()
     {
         $reference = 'Génesis 1:1';
@@ -167,7 +168,7 @@ class PineconeControllerTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_vectors_by_passage()
     {
         $passage = 'Juan 1:1-3';
@@ -215,7 +216,7 @@ class PineconeControllerTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_invalid_passage_format()
     {
         $response = $this->postJson('/api/pinecone/vector/passage', [

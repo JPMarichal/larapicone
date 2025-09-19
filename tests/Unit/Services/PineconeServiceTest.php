@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use Tests\TestCase;
 use App\Services\PineconeService;
+use PHPUnit\Framework\Attributes\Test;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -45,13 +46,13 @@ class PineconeServiceTest extends TestCase
         $clientProperty->setValue($this->pineconeService, $client);
     }
 
-    /** @test */
+    #[Test]
     public function it_initializes_correctly()
     {
         $this->assertInstanceOf(PineconeService::class, $this->pineconeService);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_debug_info()
     {
         // Mock Pinecone index stats response
@@ -73,7 +74,7 @@ class PineconeServiceTest extends TestCase
         $this->assertTrue($debugInfo['pinecone']['api_key_configured']);
     }
 
-    /** @test */
+    #[Test]
     public function it_performs_semantic_search()
     {
         // Mock Ollama embedding response
@@ -111,7 +112,7 @@ class PineconeServiceTest extends TestCase
         $this->assertEquals('Génesis 14:18', $results['results'][0]['reference']);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_vector_by_id()
     {
         $vectorId = 'AT-genesis-01-001';
@@ -138,7 +139,7 @@ class PineconeServiceTest extends TestCase
         $this->assertEquals($expectedVector, $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_vector_by_reference()
     {
         $reference = 'Génesis 1:1';
@@ -174,7 +175,7 @@ class PineconeServiceTest extends TestCase
         $this->assertEquals($expectedVector, $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_vectors_by_passage()
     {
         $passage = 'Juan 1:1-3';
@@ -237,7 +238,7 @@ class PineconeServiceTest extends TestCase
         $this->assertStringContainsString('En el principio era el Verbo', $result['concatenated_text']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_errors_gracefully()
     {
         // Test error handling for semantic search

@@ -229,4 +229,73 @@ class SparseVectorService
             }
         }
     }
+
+    /**
+     * Create a sparse vector from text
+     * 
+     * @param string $text
+     * @param array $customStopWords
+     * @return array
+     */
+    public function createSparseVector(string $text, array $customStopWords = []): array
+    {
+        if (!empty($customStopWords)) {
+            $this->stopWords = array_merge($this->stopWords, $customStopWords);
+        }
+        return $this->generateSparseVector($text);
+    }
+
+    /**
+     * Calculate cosine similarity between two sparse vectors
+     * 
+     * @param array $vec1
+     * @param array $vec2
+     * @return float
+     */
+    public function cosineSimilarity(array $vec1, array $vec2): float
+    {
+        if (empty($vec1['indices']) || empty($vec2['indices'])) {
+            return 0.0;
+        }
+
+        $dotProduct = 0.0;
+        $i = $j = 0;
+        $n1 = count($vec1['indices']);
+        $n2 = count($vec2['indices']);
+
+        // Calculate dot product
+        while ($i < $n1 && $j < $n2) {
+            if ($vec1['indices'][$i] === $vec2['indices'][$j]) {
+                $dotProduct += $vec1['values'][$i] * $vec2['values'][$j];
+                $i++;
+                $j++;
+            } elseif ($vec1['indices'][$i] < $vec2['indices'][$j]) {
+                $i++;
+            } else {
+                $j++;
+            }
+        }
+
+        return $dotProduct; // Vectors are already normalized
+    }
+
+    /**
+     * Normalize text by removing punctuation, converting to lowercase, etc.
+     * 
+     * @param string $text
+     * @return string
+     */
+    public function normalizeText(string $text): string
+    {
+        // Convert to lowercase
+        $text = mb_strtolower(trim($text));
+        
+        // Remove punctuation and special characters
+        $text = preg_replace("/[^\p{L}\p{N}\s]/u", ' ', $text);
+        
+        // Replace multiple spaces with a single space
+        $text = preg_replace('/\s+/', ' ', $text);
+        
+        return trim($text);
+    }
 }

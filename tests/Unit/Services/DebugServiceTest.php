@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 
 class DebugServiceTest extends TestCase
 {
@@ -38,7 +39,7 @@ class DebugServiceTest extends TestCase
         Mockery::close();
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_system_info()
     {
         $result = $this->debugService->getSystemInfo();
@@ -56,7 +57,7 @@ class DebugServiceTest extends TestCase
         $this->assertArrayHasKey('environment', $system);
     }
 
-    /** @test */
+    #[Test]
     public function it_checks_database_connection()
     {
         // Mock DB facade
@@ -85,7 +86,7 @@ class DebugServiceTest extends TestCase
         $this->assertEquals('test_db', $dbInfo['database']);
     }
 
-    /** @test */
+    #[Test]
     public function it_checks_pinecone_connection()
     {
         $mockPineconeInfo = [
@@ -113,7 +114,7 @@ class DebugServiceTest extends TestCase
         $this->assertEquals(1000, $pineconeInfo['vector_count']);
     }
 
-    /** @test */
+    #[Test]
     public function it_checks_embedding_service()
     {
         $this->embeddingServiceMock->shouldReceive('generateEmbedding')
@@ -138,7 +139,7 @@ class DebugServiceTest extends TestCase
         $this->assertEquals(3, $embeddingInfo['vector_length']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_service_errors_gracefully()
     {
         // Test Pinecone error
@@ -164,7 +165,7 @@ class DebugServiceTest extends TestCase
         $this->assertEquals('Embedding service unavailable', $result['services']['embedding_service']['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_environment_info()
     {
         $result = $this->debugService->getSystemInfo();
@@ -188,7 +189,55 @@ class DebugServiceTest extends TestCase
         $this->assertArrayHasKey('used', $envInfo['disk']);
     }
 
-    /** @test */
+    #[Test]
+    public function it_checks_cache_connection()
+    {
+        // Mock Cache facade
+        Cache::shouldReceive('getStore')
+            ->once()
+            ->andReturnSelf();
+            
+        Cache::shouldReceive('getStore->getName')
+            ->once()
+            ->andReturn('file');
+            
+        $result = $this->debugService->getSystemInfo();
+        $cacheInfo = $result['services']['cache'];
+        
+        $this->assertEquals('connected', $cacheInfo['status']);
+        $this->assertEquals('file', $cacheInfo['driver']);
+    }
+
+    #[Test]
+    public function it_handles_database_connection_error_gracefully()
+    {
+        // Test Database error
+        DB::shouldReceive('connection->getPdo')
+            ->once()
+            ->andThrow(new \Exception('Connection failed'));
+            
+        $result = $this->debugService->getSystemInfo();
+        
+        // Verify Database error is handled
+        $this->assertEquals('error', $result['services']['database']['status']);
+        $this->assertEquals('Connection failed', $result['services']['database']['error']);
+    }
+
+    #[Test]
+    public function it_checks_redis_connection()
+    {
+        // Mock Redis facade
+        Redis::shouldReceive('ping')
+            ->once()
+            ->andReturn('PONG');
+            
+        $result = $this->debugService->getSystemInfo();
+        $redisInfo = $result['services']['redis'];
+        
+        $this->assertEquals('connected', $redisInfo['status']);
+    }
+
+    #[Test]
     public function it_formats_bytes_correctly()
     {
         $debugService = new class($this->pineconeClientMock, $this->embeddingServiceMock) extends DebugService {
