@@ -8,13 +8,26 @@
 - [x] Identificar problema con la inicialización del cliente Pinecone
 
 ## 2. Actualización de Archivos de Pruebas
-### PineconeClientTest.php
+### SparseVectorServiceTest.php ✅
+- [x] Corregir error de sintaxis en cadenas de prueba
+- [x] Implementar métodos faltantes en SparseVectorService
+  - [x] createSparseVector()
+  - [x] cosineSimilarity()
+  - [x] normalizeText()
+- [x] Actualizar pruebas para coincidir con el comportamiento real
+- [x] Probar casos extremos (texto vacío, solo stopwords)
+- [x] Verificar cálculo de similitud coseno
+
+### PineconeClientTest.php ✅
 - [x] Convertir anotaciones a atributos PHP 8
-- [ ] Corregir error en la prueba `it_can_query_vectors` (en progreso)
+- [x] Corregir error en la prueba `it_can_query_vectors`
   - [x] Crear TestPineconeClient para pruebas
   - [x] Configurar mocks de Guzzle
-  - [ ] Resolver problema de inicialización
-- [ ] Verificar y corregir otros métodos de prueba
+  - [x] Resolver problema de inicialización
+- [x] Verificar y corregir otros métodos de prueba
+  - [x] `it_can_upsert_vectors`
+  - [x] `it_can_get_vector_by_id`
+  - [x] `it_can_get_debug_info`
 
 ### Otros archivos de prueba
 - [ ] Actualizar anotaciones en todos los archivos de prueba
