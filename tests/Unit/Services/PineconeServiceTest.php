@@ -141,7 +141,71 @@ class PineconeServiceTest extends TestCase
         );
 
         $result = $this->pineconeService->getVector($vectorId, true);
-        $this->assertEquals($expectedVector, $result);
+        $this->assertArrayHasKey('vectors', $result);
+        $this->assertArrayHasKey($vectorId, $result['vectors']);
+        $this->assertEquals($expectedVector, $result['vectors'][$vectorId]);
+    }
+    
+    #[Test]
+    public function it_returns_empty_vectors_array_when_vector_not_found()
+    {
+        $vectorId = 'non-existent-id';
+        
+        $this->mockHandler->append(
+            new Response(200, [], json_encode([
+                'vectors' => []
+            ]))
+        );
+        
+        $result = $this->pineconeService->getVector($vectorId, true);
+        $this->assertArrayHasKey('vectors', $result);
+        $this->assertEmpty($result['vectors']);
+    }
+    
+    #[Test]
+    public function it_excludes_values_when_include_values_is_false()
+    {
+        $vectorId = 'AT-genesis-01-001';
+        $fullVector = [
+            'id' => $vectorId,
+            'values' => [0.1, 0.2, 0.3],
+            'metadata' => [
+                'book' => 'Génesis',
+                'chapter' => 1,
+                'verse' => 1,
+                'content' => 'En el principio creó Dios los cielos y la tierra.'
+            ]
+        ];
+        
+        $this->mockHandler->append(
+            new Response(200, [], json_encode([
+                'vectors' => [
+                    $vectorId => $fullVector
+                ]
+            ]))
+        );
+        
+        $result = $this->pineconeService->getVector($vectorId, false);
+        $this->assertArrayHasKey('vectors', $result);
+        $this->assertArrayHasKey($vectorId, $result['vectors']);
+        $this->assertArrayNotHasKey('values', $result['vectors'][$vectorId]);
+        $this->assertEquals($vectorId, $result['vectors'][$vectorId]['id']);
+        $this->assertArrayHasKey('metadata', $result['vectors'][$vectorId]);
+    }
+    
+    #[Test]
+    public function it_handles_api_errors_gracefully()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Error getting vector from Pinecone');
+        
+        $this->mockHandler->append(
+            new Response(500, [], json_encode([
+                'error' => 'Internal server error'
+            ]))
+        );
+        
+        $this->pineconeService->getVector('any-id', true);
     }
 
     #[Test]
