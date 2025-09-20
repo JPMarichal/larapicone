@@ -30,15 +30,41 @@
   - [x] `it_can_get_debug_info`
 
 ### Otros archivos de prueba
-- [ ] Actualizar anotaciones en todos los archivos de prueba
-- [ ] Verificar y corregir pruebas fallidas
+- [ ] **PineconeServiceTest.php**
+  - [ ] Actualizar anotaciones a atributos PHP 8
+  - [ ] Verificar y corregir pruebas de integración con Pinecone
+  - [ ] Probar manejo de errores y casos límite
+
+- [ ] **ReferenceServiceTest.php**
+  - [ ] Actualizar anotaciones a atributos PHP 8
+  - [ ] Verificar mapeo de referencias bíblicas
+  - [ ] Probar casos especiales (Doctrina y Convenios, etc.)
+
+- [ ] **SearchServiceTest.php**
+  - [ ] Actualizar anotaciones a atributos PHP 8
+  - [ ] Verificar búsquedas semánticas
+  - [ ] Probar búsquedas con diferentes parámetros
+
+- [ ] **Feature Tests**
+  - [ ] Actualizar anotaciones en pruebas de características
+  - [ ] Verificar endpoints de la API
+  - [ ] Probar flujos completos de usuario
 
 ## 3. Ejecución y Verificación
 - [x] Ejecutar prueba simple exitosamente
-- [ ] Resolver problemas de inicialización en pruebas
+- [x] Resolver problemas de inicialización en pruebas
 - [ ] Ejecutar todas las pruebas unitarias
+  - [ ] Ejecutar pruebas de servicios
+  - [ ] Ejecutar pruebas de controladores
+  - [ ] Verificar coherencia de datos
 - [ ] Ejecutar pruebas de características (feature)
+  - [ ] Probar flujos de autenticación
+  - [ ] Verificar respuestas de la API
+  - [ ] Probar validaciones
 - [ ] Verificar cobertura de código
+  - [ ] Generar informe de cobertura
+  - [ ] Identificar áreas sin cobertura
+  - [ ] Aumentar cobertura si es necesario
 
 ## 4. Optimización
 - [ ] Mejorar el rendimiento de las pruebas
