@@ -44,9 +44,10 @@ Route::get('/pinecone/test', function (\App\Services\PineconeService $pinecone) 
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+use App\Http\Controllers\Api\UserController;
+
+// Ruta para obtener el usuario autenticado
+Route::middleware('auth:web')->get('/user', UserController::class);
 
 // Semantic search endpoint
 Route::post('/pinecone/search/semantic', [PineconeController::class, 'searchSemantic']);
